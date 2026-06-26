@@ -33,7 +33,7 @@ class SmolagentsBridge(AgentBridge):
             return "[Smolagents] 未安装，无法执行"
 
         ollama_url = "http://localhost:11434/v1"
-        local_model = "qwen2.5:7b"
+        local_model = "qwen2.5-coder:7b"  # 代码专用模型
 
         model_id = local_model if model in ("auto", "local") else "gpt-4o"
         api_base = ollama_url if model in ("auto", "local") else "https://api.openai.com/v1"

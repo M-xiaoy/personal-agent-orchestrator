@@ -36,8 +36,10 @@ class LangGraphBridge(AgentBridge):
         if not self.is_available():
             return "[LangGraph] 未安装，无法执行"
 
+        # 规划/复杂任务用 deepseek-r1（推理更强）
+        local_model = "deepseek-r1:7b"
         llm = self._llm_cls(
-            model="qwen2.5:7b" if model in ("auto", "local") else "gpt-4o",
+            model=local_model if model in ("auto", "local") else "gpt-4o",
             base_url="http://localhost:11434",
             temperature=0.3,
             num_predict=1024,

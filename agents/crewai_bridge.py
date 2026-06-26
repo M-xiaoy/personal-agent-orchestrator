@@ -36,8 +36,10 @@ class CrewAIBridge(AgentBridge):
             return "[CrewAI] 未安装，无法执行"
 
         # 构建本地 LLM
+        # 分析类任务用 deepseek-r1（推理更强），通用类回退 qwen2.5
+        local_model = "ollama/deepseek-r1:7b"
         llm = self._llm_cls(
-            model="ollama/qwen2.5:7b" if model in ("auto", "local") else "gpt-4o",
+            model=local_model if model in ("auto", "local") else "gpt-4o",
             base_url="http://localhost:11434",
             temperature=0.3,
         )
