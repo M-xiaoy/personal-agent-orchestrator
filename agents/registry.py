@@ -20,7 +20,8 @@ def _lazy_register():
     from agents.crewai_bridge import CrewAIBridge
     from agents.agno_bridge import AgnoBridge
     from agents.langgraph_bridge import LangGraphBridge
-    _AGENT_CLASSES.extend([SmolagentsBridge, CrewAIBridge, AgnoBridge, LangGraphBridge])
+    from agents.vision_bridge import VisionBridge
+    _AGENT_CLASSES.extend([SmolagentsBridge, CrewAIBridge, AgnoBridge, LangGraphBridge, VisionBridge])
 
 
 def list_agents() -> list[dict]:
@@ -88,5 +89,5 @@ def get_agent_for_task(task_type: str, prefer: str = "") -> Optional[AgentBridge
 
 def _supports_list(bridge: AgentBridge) -> list[str]:
     """获取 Agent 支持的任务类型列表"""
-    types = ["code", "analyze", "research", "collaborate", "general", "plan", "complex", "sequential"]
+    types = ["code", "analyze", "research", "collaborate", "general", "plan", "complex", "sequential", "vision"]
     return [t for t in types if bridge.supports(t)]

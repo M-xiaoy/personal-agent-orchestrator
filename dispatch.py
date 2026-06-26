@@ -40,8 +40,16 @@ def dispatch(task_type: str, params: dict = None,
 
 
 def run_agent(task: str, task_type: str = "general",
-              model: str = "local", prefer: str = "") -> str:
-    """立即用 Agent 框架执行（不走调度器，等结果返回）"""
+              model: str = "auto", prefer: str = "") -> str:
+    """立即用 Agent 框架执行（不走调度器，等结果返回）
+    
+    用法:
+        run_agent("写个快排")
+        run_agent("分析这段代码", task_type="analyze")
+        run_agent("描述这张图", task_type="vision")
+        run_agent("...", model="pro")     # 强制用 v4-pro
+        run_agent("...", model="flash")   # 强制用 v4-flash
+    """
     from scheduler import execute_agent_task
     return execute_agent_task({
         "task": task,
