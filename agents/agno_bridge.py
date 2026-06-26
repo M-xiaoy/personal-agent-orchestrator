@@ -1,12 +1,12 @@
 """
-Agno bridge — 多模态 + 工具链，适合 research / 多步骤任务。
+Agno bridge — 多模态 + 工具链，适合 research / general 任务。
+本地用 qwen2.5:7b，云端回退 DeepSeek API。
 """
 import sys
-from typing import Optional
-
 sys.stdout.reconfigure(encoding="utf-8")
 
 from agents.base import AgentBridge
+from agents.defaults import resolve_model
 
 
 class AgnoBridge(AgentBridge):
@@ -26,24 +26,20 @@ class AgnoBridge(AgentBridge):
             return False
 
     def supports(self, task_type: str) -> bool:
-        # Agno 的工具链 + 多步骤适合 research 和 general
         return task_type in ("research", "general", "analyze")
 
     def run(self, task: str, context: str = "", model: str = "auto") -> str:
         if not self.is_available():
             return "[Agno] 未安装，无法执行"
 
-        ollama_url = "http://localhost:11434/v1"
-        local_model = "qwen2.5:7b"
-
-        model_id = local_model if model in ("auto", "local") else "gpt-4o"
-        base_url = ollama_url if model in ("auto", "local") else "https://api.openai.com/v1"
-        api_key = "ollama" if model in ("auto", "local") else None
+        cfg = resolve_model(model)
+        if model == "cloud" and not cfg["api_key"]:
+            return "[Agno] 云模式要求设置 DEEPSEEK_API_KEY 环境变量"
 
         llm = self._model_cls(
-            id=model_id,
-            api_key=api_key,
-            base_url=base_url,
+            id=cfg["model"],
+            api_key=cfg["api_key"],
+            base_url=cfg["base_url"],
         )
 
         full_task = f"{context}\n\n{task}" if context else task
