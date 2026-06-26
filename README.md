@@ -13,7 +13,7 @@
 
 当你有 Smolagents、CrewAI、Agno 这些框架都装在电脑上时，谁来决定每次任务该用哪个？
 
-这个项目就是我（小云）的决策系统——我根据任务复杂度自动路由，简单任务直接干，复杂任务派子Agent。
+这个项目的核心思路是根据任务复杂度自动路由：简单任务走工程派直接干，复杂任务走算法派拆解后派子Agent。
 
 ---
 
@@ -21,31 +21,25 @@
 
 ### 工程派 vs 算法派
 
-收到任务时，我先做三维度评估：
+收到任务时，先做三维度评估：
 
-| 维度 | 低分 | 高分 |
+| 维度 | 低分 → 工程派 | 高分 → 算法派 |
 |---|---|---|
-| **确定性** | 没有现成工具链 | 有直接工具可用 |
+| **确定性** | 有直接工具链可用 | 没有现成答案 |
 | **推理深度** | 一问一答即可 | 需要多步推理循环 |
 | **不确定性** | 答案唯一 | 多种可能性需对比 |
 
-- **工程派**（低分）→ 我直接干，快、省
-- **算法派**（高分）→ 拆任务→写文件→派子Agent→我把关
-
 ### 文件即接口
 
+任务通过文件传递，不传对话历史：
+
 ```
-任务文件 (TASK.md)               结果文件 (RESULT.md)
-┌──────────────────┐            ┌──────────────────┐
-│ 任务描述          │  ───────→  │ 执行结果          │
-│ 上下文            │   子Agent  │ 结论/代码/数据     │
-│ 配置要求          │    读&写   │ 需要补充的问题     │
-└──────────────────┘            └──────────────────┘
+TASK.md (任务描述 + 上下文)  ──→  子Agent  ──→  RESULT.md (执行结果)
 ```
 
-- 不出传对话历史，只给任务文件（≤1000字）
+- 任务文件 ≤ 1000 字，精简聚焦
 - 子Agent独立执行，结果写回文件
-- 我收结果、整合、把关，最后给你
+- 调度器收结果、去重、整合、把关
 
 ---
 
@@ -53,11 +47,12 @@
 
 ```
 orchestrator/
-├── task_queue.py      # SQLite 任务队列
-├── scheduler.py       # 调度执行器（cron每10分钟唤醒）
+├── core.py            # 算法派完整工作流（评估→拆解→分发→执行→整合）
 ├── router.py          # 路由决策器（三维度分类器）
 ├── dispatcher.py      # 文件即接口（任务分发/结果收集）
 ├── dispatch.py        # 聊天接口（创建任务入口）
+├── task_queue.py      # SQLite 任务队列
+├── scheduler.py       # 调度执行器（cron 每10分钟唤醒）
 ├── tasks/             # 任务文件目录
 │   └── task_xxx/      # 单个任务
 │       ├── TASK.md    #   任务描述
@@ -71,39 +66,51 @@ orchestrator/
 
 ## 快速开始
 
-### 任务路由
+### 一键运行工作流
+
+```python
+from core import run_workflow
+
+# 算法派：拆解→并行执行→整合
+result = run_workflow("对比AutoGPT和CrewAI的设计理念")
+print(result["route"])        # → "algorithm"
+print(result["integrated"])   # → 整合后的结果
+
+# 工程派：直接返回
+result = run_workflow("查一下AutoGPT的stars")
+print(result["route"])        # → "engineering"
+```
+
+### 路由决策器
 
 ```bash
-# 1. 评估一个任务走工程派还是算法派
 python -c "from router import assess_complexity; print(assess_complexity('对比AutoGPT和CrewAI'))"
 ```
 
-### 运行 Agent 追踪器
+### 手动调度
 
 ```bash
-python agent_tracker/run.py
+cd orchestrator && python scheduler.py
 ```
 
-打开 `agent_tracker/output/dashboard.html` 查看6个Agent框架的每日数据对比。
+---
 
-```bash
-# 1. 评估一个任务走工程派还是算法派
-from router import assess_complexity
-result = assess_complexity("对比AutoGPT和CrewAI的设计理念")
-print(result)  # → route: "algorithm"
+## 工作流程
 
-# 2. 创建任务文件（派给子Agent）
-from dispatcher import dispatch_task
-info = dispatch_task("分析一下OpenHands的代码能力", sub_agent="smolagents")
-print(info["task_file"])  # → orchestrator/tasks/task_xxx/TASK.md
-
-# 3. 调度器自动执行（或手动）
-# cd orchestrator && python scheduler.py
-
-# 4. 查看结果
-from dispatcher import collect_results
-result = collect_results(info["task_dir"])
-print(result["result"])
+```
+收到任务
+  ↓
+三维度复杂度评估
+  ↓
+工程派 ──────────→ 直接执行 ──→ 交付
+  ↓
+算法派
+  ↓
+拆解为子任务 ──→ 写TASK.md ──→ 分配子Agent
+  ↓                                ↓
+整合结果 ←── 读RESULT.md ←── 子Agent执行
+  ↓
+我把关 ──→ 交付
 ```
 
 ---
@@ -117,16 +124,6 @@ print(result["result"])
 | ✅ Agno | 已装 | 多模态任务 |
 | ⏳ OpenHands | 需Docker | 代码专精 |
 | ⏳ LangGraph | 待配 | 状态机流程 |
-
----
-
-## 实验记录
-
-| 实验 | 结论 |
-|---|---|
-| qwen2.5:7b 跑 Agent | 稳但泛，适合简单工具调用 |
-| deepseek-r1:7b 跑 Agent | 聪明但tool call格式不稳，需要翻译层 |
-| 7B vs DeepSeek v4 | 本地省token但有性能损失，急活用云端 |
 
 ---
 
