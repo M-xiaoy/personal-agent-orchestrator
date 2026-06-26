@@ -105,6 +105,55 @@ def collect_results(task_dir: str, timeout_seconds: int = 600) -> dict:
     return {"status": "timeout", "error": "等待超时", "task_dir": task_dir}
 
 
+def dispatch_and_execute(
+    task: str,
+    context: str = "",
+    sub_agent: str = "auto",
+    model: str = "local",
+) -> dict:
+    """
+    创建任务 + 立即执行（不走调度器等待）。
+    自动根据任务类型选择合适的 Agent 框架。
+    """
+    # 先创建任务文件
+    info = dispatch_task(task, context, sub_agent, model)
+    task_dir = Path(info["task_dir"])
+
+    # 推断 task_type
+    task_lower = task.lower()
+    if any(w in task_lower for w in ["代码", "写一个", "实现", "编写", "脚本", "def ", "class "]):
+        task_type = "code"
+    elif any(w in task_lower for w in ["对比", "比较", "vs", "分析", "评估"]):
+        task_type = "analyze"
+    elif any(w in task_lower for w in ["搜索", "调研", "查一下"]):
+        task_type = "research"
+    else:
+        task_type = "general"
+
+    # 选 Agent
+    try:
+        from agents import get_agent_for_task
+        agent = get_agent_for_task(task_type, prefer=sub_agent if sub_agent != "auto" else "")
+        if not agent:
+            _update_status(task_dir / "status.json", "failed", "无可用 Agent")
+            info["status"] = "failed"
+            info["error"] = "无可用 Agent 框架"
+            return info
+
+        result = agent.run(task, context=context, model=model)
+        (task_dir / "RESULT.md").write_text(str(result), encoding="utf-8")
+        _update_status(task_dir / "status.json", "done")
+        info["status"] = "done"
+        info["result"] = result
+        info["agent_used"] = agent.name
+    except Exception as e:
+        _update_status(task_dir / "status.json", "failed", str(e))
+        info["status"] = "failed"
+        info["error"] = str(e)
+
+    return info
+
+
 def list_pending_tasks() -> list:
     """列出所有待处理的任务"""
     results = []

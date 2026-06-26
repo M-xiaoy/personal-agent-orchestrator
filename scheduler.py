@@ -7,6 +7,7 @@ orchestrator/scheduler.py — 调度执行器
   crawl_web   → 爬网页/调API（无LLM）
   run_code    → 执行 Python 脚本
   query_kb    → 搜索知识库
+  agent_task  → 用 Agent 框架执行（Smolagents/CrewAI/Agno）
   need_think  → 等我处理（调度器跳过）
 """
 
@@ -89,11 +90,42 @@ def execute_query_kb(params: dict) -> str:
         return f"知识库查询失败: {e}"
 
 
+def execute_agent_task(params: dict) -> str:
+    """用 Agent 框架执行任务"""
+    task = params.get("task", "")
+    task_type = params.get("task_type", "general")
+    context = params.get("context", "")
+    prefer = params.get("prefer", "")
+    model = params.get("model", "local")
+
+    if not task:
+        return "缺少 task 参数"
+
+    try:
+        from agents import get_agent_for_task, list_agents
+        
+        agents = list_agents()
+        available = [a["name"] for a in agents if a["available"]]
+        if not available:
+            return "无可用 Agent 框架（均未安装）"
+
+        agent = get_agent_for_task(task_type, prefer=prefer)
+        if not agent:
+            names = ", ".join(available)
+            return f"无可处理 '{task_type}' 的 Agent。已安装: {names}"
+
+        result = agent.run(task, context=context, model=model)
+        return result[:5000] if result else "（无输出）"
+    except Exception as e:
+        return f"Agent 执行失败: {e}"
+
+
 # 能力注册表
 CAPABILITIES = {
     "crawl_web": execute_web_crawl,
     "run_code": execute_run_code,
     "query_kb": execute_query_kb,
+    "agent_task": execute_agent_task,
 }
 
 

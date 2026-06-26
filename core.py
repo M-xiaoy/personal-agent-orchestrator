@@ -209,18 +209,52 @@ def _web_search(params: dict | str = None) -> str:
 
 
 def _local_code(params: dict | str = None) -> str:
-    """子进程跑代码（免费）"""
+    """代码类任务 —— 用 Smolagents 生成，或用子进程执行"""
     task = params.get("task", "") if isinstance(params, dict) else str(params)
-    return (
-        f"[需写代码] {task[:200]}\n"
-        f"（代码类任务由调度器创建任务文件后执行）"
-    )
+    if not task:
+        return "（空任务）"
+
+    try:
+        from agents import get_agent_for_task
+        agent = get_agent_for_task("code", prefer="smolagents")
+        if agent:
+            result = agent.run(task)
+            return f"[Agent: {agent.name}]\n{result[:4000]}" if result else "（Agent 无输出）"
+        # 回退：子进程执行
+        result = subprocess.run(
+            [sys.executable, "-c", f"print({repr(task[:500])})"],
+            capture_output=True, text=True, timeout=15
+        )
+        return result.stdout[:2000] + (result.stderr[:500] if result.stderr else "")
+    except Exception as e:
+        return f"[代码执行失败] {e}\n任务: {task[:200]}"
 
 
 def _need_cloud(params: dict | str = None) -> str:
-    """需要云端模型处理（标记为cloud，调度时由我分析）"""
-    task = params.get("task", "") if isinstance(params, dict) else str(params)
-    return f"[需云处理] {task}"
+    """
+    需要 LLM 处理 —— 自动选择最合适的 Agent 框架执行。
+    code类 → Smolagents | 分析类 → CrewAI | 其他 → 自动路由
+    """
+    if isinstance(params, dict):
+        task = params.get("task", "")
+        task_type = params.get("type", "analyze")
+    else:
+        task = str(params)
+        task_type = "analyze"
+
+    if not task:
+        return "（空任务）"
+
+    try:
+        from agents import get_agent_for_task
+        agent = get_agent_for_task(task_type)
+        if agent:
+            result = agent.run(task, model="local")
+            return f"[Agent: {agent.name}]\n{result[:3000]}" if result else "（Agent 无输出）"
+        else:
+            return f"[需云处理] 无合适 Agent 框架。任务: {task[:200]}"
+    except Exception as e:
+        return f"[Agent调用失败] {e}\n任务: {task[:200]}"
 
 
 # handler 映射

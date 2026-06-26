@@ -1,12 +1,27 @@
 """
-orchestrator/dispatch.py — 小云的调度接口
-============================================
-我在聊天中用这个模块创建任务、检查状态。
-用法（在我的上下文中）：
-    from orchestrator.dispatch import dispatch, check, summary
+orchestrator/dispatch.py — 调度接口（我用来创建任务、查状态）
+===============================================================
+用法:
+    from dispatch import dispatch, check, summary, run_agent
+
+    # 轻量任务（调度器自动执行）
     tid = dispatch("crawl_web", {"url": "..."})
-    check(tid)  # 获取结果
-    summary()   # 查看所有任务状态
+    tid = dispatch("run_code", {"code": "print(1+1)"})
+    tid = dispatch("query_kb", {"query": "Smolagents"})
+
+    # Agent 任务（自动选择框架）
+    tid = dispatch("agent_task", {
+        "task": "对比 Smolagents 和 CrewAI",
+        "task_type": "analyze",
+        "model": "local",
+    })
+
+    # 直接运行 Agent（不等调度器，立即执行）
+    result = run_agent("对比 Smolagents 和 CrewAI", task_type="analyze")
+
+    # 查看状态
+    check(tid)
+    summary()
 """
 
 from pathlib import Path
@@ -20,8 +35,20 @@ _q = TaskQueue()
 
 def dispatch(task_type: str, params: dict = None,
              need_me: bool = False, notify: bool = True) -> str:
-    """创建一个任务，返回任务ID"""
+    """创建任务到队列，返回任务ID"""
     return _q.add(task_type, params or {}, need_me=need_me, notify=notify)
+
+
+def run_agent(task: str, task_type: str = "general",
+              model: str = "local", prefer: str = "") -> str:
+    """立即用 Agent 框架执行（不走调度器，等结果返回）"""
+    from scheduler import execute_agent_task
+    return execute_agent_task({
+        "task": task,
+        "task_type": task_type,
+        "model": model,
+        "prefer": prefer,
+    })
 
 
 def check(task_id: str) -> dict:
@@ -30,7 +57,7 @@ def check(task_id: str) -> dict:
 
 
 def summary() -> str:
-    """任务概览"""
+    """任务队列概览"""
     stats = _q.count()
     recent = _q.recent(5)
 
@@ -47,6 +74,16 @@ def summary() -> str:
                            "running": "[..]", "pending": "[..]"}.get(t["status"], "[?]")
             me = " (需小云)" if t["need_me"] else ""
             lines.append(f"  {status_icon} {t['type']} #{t['id'][:8]}{me}")
+
+    # 显示可用 Agent
+    try:
+        from agents import list_agents
+        agents = list_agents()
+        avail = [a["name"] for a in agents if a["available"]]
+        if avail:
+            lines.append(f"\n[可用 Agent] {' '.join(avail)}")
+    except ImportError:
+        pass
 
     return "\n".join(lines)
 
