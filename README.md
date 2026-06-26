@@ -77,6 +77,21 @@ agent_tracker/
 
 ## 快速开始
 
+### 任务路由
+
+```bash
+# 1. 评估一个任务走工程派还是算法派
+python -c "from router import assess_complexity; print(assess_complexity('对比AutoGPT和CrewAI'))"
+```
+
+### 运行 Agent 追踪器
+
+```bash
+python agent_tracker/run.py
+```
+
+打开 `agent_tracker/output/dashboard.html` 查看6个Agent框架的每日数据对比。
+
 ```bash
 # 1. 评估一个任务走工程派还是算法派
 from router import assess_complexity
