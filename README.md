@@ -53,24 +53,18 @@
 
 ```
 orchestrator/
-├── task_queue.py      # SQLite 任务队列（调度器使用）
+├── task_queue.py      # SQLite 任务队列
 ├── scheduler.py       # 调度执行器（cron每10分钟唤醒）
 ├── router.py          # 路由决策器（三维度分类器）
 ├── dispatcher.py      # 文件即接口（任务分发/结果收集）
-├── dispatch.py        # 聊天接口（我快速创建任务的入口）
+├── dispatch.py        # 聊天接口（创建任务入口）
 ├── tasks/             # 任务文件目录
 │   └── task_xxx/      # 单个任务
 │       ├── TASK.md    #   任务描述
 │       ├── RESULT.md  #   执行结果
 │       └── status.json #  状态信息
-├── task.db            # 任务数据库
-└── test_smolagents.py # 本地Agent实验记录
-
-agent_tracker/
-├── run.py             # GitHub Agent 框架追踪器
-├── fetcher.py         # 每日爬取6个框架数据
-├── render.py          # Plotly 柱状图 Dashboard
-└── output/dashboard.html  # 生成的报告
+├── tasks.db           # 任务数据库
+└── README.md          # 项目说明
 ```
 
 ---
